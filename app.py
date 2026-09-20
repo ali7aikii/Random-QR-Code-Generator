@@ -34,11 +34,10 @@ def form():
     if not session.get('authorized') or time.time() > session.get('expires', 0):
         return "Session expired or unauthorized. Please scan the board again.", 403
         
-    # Serve the Google Form inside a fullscreen iframe to hide the real Google URL
     return '''
     <html>
       <body style="margin:0;padding:0;">
-        <iframe src="https://docs.google.com/forms/YOUR_FORM_LINK/viewform?embedded=true" 
+        <iframe src="https://docs.google.com/forms/d/e/1FAIpQLScFvW8MtbhXeZa9WZai_OXQIgtK1lfj_4qzmONzVDzhfzSlQw/viewform?usp=dialog" 
                 width="100%" height="100%" frameborder="0" marginheight="0" marginwidth="0">
             Loading…
         </iframe>
