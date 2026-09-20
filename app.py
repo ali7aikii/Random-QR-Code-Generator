@@ -7,20 +7,34 @@ app = Flask(__name__)
 app.secret_key = 'generate_a_random_secret_key_here'
 QR_SECRET = b'my_qr_signature_secret'
 
-# 1. THE PROJECTOR SCREEN (This fixes the 404 error)
+# Set your secret Teacher PIN here
+TEACHER_PIN = "7788" 
+
+# 1. HIDE THE DEFAULT URL (Blocks students from snooping)
 @app.route('/')
 def index():
-    return '''
+    return "Access Denied.", 403
+
+# 2. THE SECURE PROJECTOR SCREEN (Requires PIN)
+@app.route('/projector')
+def projector():
+    # Check if the URL contains the correct PIN
+    pin = request.args.get('pin')
+    if pin != TEACHER_PIN:
+        return "Unauthorized. Teacher access only.", 401
+        
+    # Note the f''' here and the doubled {{ }} for CSS/JS
+    return f'''
     <!DOCTYPE html>
     <html>
     <head>
         <title>QR Attendance</title>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
         <style>
-            body { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; font-family: sans-serif; background-color: #f4f4f9;}
-            #qrcode { margin-top: 20px; padding: 20px; background: white; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
-            h1 { color: #333; }
-            #timer { color: #e74c3c; }
+            body {{ display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; font-family: sans-serif; background-color: #f4f4f9;}}
+            #qrcode {{ margin-top: 20px; padding: 20px; background: white; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }}
+            h1 {{ color: #333; }}
+            #timer {{ color: #e74c3c; }}
         </style>
     </head>
     <body>
@@ -30,42 +44,46 @@ def index():
         
         <script>
             const qrContainer = document.getElementById("qrcode");
-            let qrcode = new QRCode(qrContainer, { width: 300, height: 300 });
+            let qrcode = new QRCode(qrContainer, {{ width: 300, height: 300 }});
             let countdownInterval;
             
-            async function updateQR() {
-                // Fetch new secure token from the server
-                const response = await fetch('/generate');
-                const data = await response.json();
+            async function updateQR() {{
+                // Securely pass the PIN to the generator
+                const response = await fetch('/generate?pin={TEACHER_PIN}');
+                if (!response.ok) return; // Stop if unauthorized
                 
-                // Build the URL the student will scan
+                const data = await response.json();
                 const scanUrl = window.location.origin + "/scan?t=" + data.t + "&token=" + data.token;
                 qrcode.makeCode(scanUrl);
                 
-                // Reset timer
                 let timeLeft = 10;
                 document.getElementById("timer").innerText = timeLeft;
                 
                 if (countdownInterval) clearInterval(countdownInterval);
-                countdownInterval = setInterval(() => {
+                countdownInterval = setInterval(() => {{
                     timeLeft -= 1;
                     document.getElementById("timer").innerText = timeLeft;
-                }, 1000);
-            }
+                }}, 1000);
+            }}
 
             updateQR();
-            setInterval(updateQR, 10000); // Fetch a new QR code every 10 seconds
+            setInterval(updateQR, 10000); 
         </script>
     </body>
     </html>
     '''
 
-# 2. GENERATE NEW TOKENS (Used by the projector screen)
+# 3. SECURE TOKEN GENERATOR (Blocks hackers from making fake tokens)
 @app.route('/generate')
 def generate():
+    pin = request.args.get('pin')
+    if pin != TEACHER_PIN:
+        return jsonify({{"error": "Unauthorized"}}), 401
+        
     current_time = str(int(time.time()))
     token = hmac.new(QR_SECRET, current_time.encode(), hashlib.sha256).hexdigest()
     return jsonify({"t": current_time, "token": token})
+
 
 # 3. SCAN VALIDATION (When a student scans the QR code)
 @app.route('/scan')
@@ -89,7 +107,6 @@ def scan():
     
     return redirect('/form')
 
-# 4. THE SECURE FORM
 # 4. THE SECURE FORM
 @app.route('/form')
 def form():
